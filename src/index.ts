@@ -100,7 +100,7 @@ Examples:
     },
   },
   async (params) => {
-    const fact = store.addFact({
+    const { fact, duplicates } = store.addFact({
       content: params.content,
       category: params.category,
       confidence: params.confidence,
@@ -121,7 +121,15 @@ Examples:
             category: fact.category,
             confidence: fact.confidence,
             status: fact.status,
-          }
+          },
+          ...(duplicates.length > 0 && {
+            warning: "Similar facts already exist",
+            similar_facts: duplicates.map(d => ({
+              id: d.fact.id,
+              content: d.fact.content,
+              similarity: Math.round(d.similarity * 100) + "%",
+            })),
+          }),
         }, null, 2),
       }],
     };
@@ -165,7 +173,7 @@ Returns: Summary of stored facts with their IDs.`,
     },
   },
   async (params) => {
-    const stored = params.facts.map(f =>
+    const results = params.facts.map(f =>
       store.addFact({
         content: f.content,
         category: f.category,
@@ -180,12 +188,24 @@ Returns: Summary of stored facts with their IDs.`,
         type: "text" as const,
         text: JSON.stringify({
           stored: true,
-          count: stored.length,
-          facts: stored.map(f => ({
-            id: f.id,
-            content: f.content,
-            category: f.category,
+          count: results.length,
+          facts: results.map(r => ({
+            id: r.fact.id,
+            content: r.fact.content,
+            category: r.fact.category,
           })),
+          ...(results.some(r => r.duplicates.length > 0) && {
+            warnings: results
+              .filter(r => r.duplicates.length > 0)
+              .map(r => ({
+                new_fact: r.fact.content,
+                similar_to: r.duplicates.map(d => ({
+                  id: d.fact.id,
+                  content: d.fact.content,
+                  similarity: Math.round(d.similarity * 100) + "%",
+                })),
+              })),
+          }),
         }, null, 2),
       }],
     };

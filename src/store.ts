@@ -10,6 +10,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
+import { tokenSimilarity } from "./similarity.js";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -286,7 +287,7 @@ export class MemoryStore {
 
     const saved: Fact[] = [];
     for (const draft of toSave) {
-      const fact = this.addFact({
+      const { fact } = this.addFact({
         content: draft.content,
         category: draft.category,
         confidence: draft.confidence,
@@ -316,7 +317,10 @@ export class MemoryStore {
     status?: FactStatus;
     tags?: string[];
     supersedes?: string;
-  }): Fact {
+  }): { fact: Fact; duplicates: Array<{ fact: Fact; similarity: number }> } {
+    // Check for duplicates before adding
+    const duplicates = this.findSimilar(params.content, params.category);
+
     const now = new Date().toISOString();
     const fact: Fact = {
       id: randomUUID(),
@@ -343,7 +347,7 @@ export class MemoryStore {
 
     this.data.facts.push(fact);
     this.save();
-    return fact;
+    return { fact, duplicates };
   }
 
   getFact(id: string): Fact | undefined {
@@ -385,6 +389,27 @@ export class MemoryStore {
     );
 
     return results.slice(0, params.limit ?? 20);
+  }
+
+  /** Find existing facts similar to the given content. Returns matches above threshold. */
+  findSimilar(
+    content: string,
+    category: string,
+    threshold = 0.7,
+  ): Array<{ fact: Fact; similarity: number }> {
+    const candidates = this.data.facts.filter(
+      f => f.category === category && f.status !== "rejected"
+    );
+
+    const matches: Array<{ fact: Fact; similarity: number }> = [];
+    for (const fact of candidates) {
+      const sim = tokenSimilarity(content, fact.content);
+      if (sim >= threshold) {
+        matches.push({ fact, similarity: sim });
+      }
+    }
+
+    return matches.sort((a, b) => b.similarity - a.similarity);
   }
 
   updateFactStatus(id: string, status: FactStatus): Fact | undefined {

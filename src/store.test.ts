@@ -29,7 +29,7 @@ describe("MemoryStore basics", () => {
   });
 
   it("should add and retrieve a fact", () => {
-    const fact = store.addFact({
+    const { fact } = store.addFact({
       content: "Likes TypeScript",
       category: "technical",
     });
@@ -39,5 +39,38 @@ describe("MemoryStore basics", () => {
 
     const found = store.getFact(fact.id);
     assert.deepEqual(found, fact);
+  });
+});
+
+describe("duplicate detection", () => {
+  let store: MemoryStore;
+  let dir: string;
+
+  beforeEach(() => {
+    ({ store, dir } = makeTempStore());
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("should find similar existing facts", () => {
+    store.addFact({ content: "Works as a consultant in London", category: "work" });
+    const matches = store.findSimilar("Works as a consultant based in London", "work");
+    assert.ok(matches.length > 0);
+    assert.ok(matches[0].similarity >= 0.7);
+  });
+
+  it("should not match across different categories by default", () => {
+    store.addFact({ content: "Works as a consultant", category: "work" });
+    const matches = store.findSimilar("Works as a consultant", "personal");
+    assert.equal(matches.length, 0);
+  });
+
+  it("should not match rejected facts", () => {
+    const { fact } = store.addFact({ content: "Works as a consultant", category: "work" });
+    store.updateFactStatus(fact.id, "rejected");
+    const matches = store.findSimilar("Works as a consultant", "work");
+    assert.equal(matches.length, 0);
   });
 });
