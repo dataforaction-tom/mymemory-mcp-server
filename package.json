@@ -1,0 +1,35 @@
+{
+  "name": "memory-mcp-server",
+  "version": "0.1.0",
+  "description": "MCP server for portable LLM memory — store, retrieve, and manage personal facts across any LLM provider",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "memory-mcp-server": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": ["mcp", "llm", "memory", "context", "ai"],
+  "author": "Tom CW",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.3",
+    "typescript": "^5.9.3"
+  }
+}
