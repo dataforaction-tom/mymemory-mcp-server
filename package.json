@@ -16,8 +16,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsc --watch",
-    "test": "node --import tsx --test src/store.test.ts src/similarity.test.ts",
-    "test:watch": "node --import tsx --test --watch src/store.test.ts src/similarity.test.ts",
+    "test": "node --import tsx --test src/store.test.ts src/similarity.test.ts src/index.test.ts",
+    "test:watch": "node --import tsx --test --watch src/store.test.ts src/similarity.test.ts src/index.test.ts",
     "prepublishOnly": "npm run build"
   },
   "engines": {

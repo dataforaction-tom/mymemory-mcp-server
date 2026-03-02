@@ -1042,9 +1042,33 @@ Returns: Stats object.`,
   }
 );
 
-// ─── Resource: Memory profile as a readable resource ─────────────────
+// ─── Resource: Memory profile for automatic context injection ────────
 
-// (Resources let clients browse data without tool calls)
+server.registerResource(
+  "memory-profile",
+  "memory://profile",
+  {
+    title: "Memory Profile",
+    description:
+      "The user's full memory profile — narrative documents and confirmed facts. " +
+      "Subscribe to this resource for automatic context injection at conversation start.",
+    mimeType: "text/plain",
+  },
+  async (uri) => {
+    const context = store.buildContext();
+    return {
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: "text/plain",
+          text:
+            context ||
+            "(No memory context available yet. Start storing facts to build the user's profile.)",
+        },
+      ],
+    };
+  }
+);
 
 // ─── Start ───────────────────────────────────────────────────────────
 
