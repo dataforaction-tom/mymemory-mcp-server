@@ -412,13 +412,24 @@ export class MemoryStore {
     return matches.sort((a, b) => b.similarity - a.similarity);
   }
 
-  updateFactStatus(id: string, status: FactStatus): Fact | undefined {
+  updateFact(id: string, updates: {
+    content?: string;
+    category?: string;
+    confidence?: number;
+    status?: FactStatus;
+    tags?: string[];
+  }): Fact | undefined {
     const fact = this.data.facts.find(f => f.id === id);
-    if (fact) {
-      fact.status = status;
-      fact.updated_at = new Date().toISOString();
-      this.save();
-    }
+    if (!fact) return undefined;
+
+    if (updates.content !== undefined) fact.content = updates.content;
+    if (updates.category !== undefined) fact.category = updates.category;
+    if (updates.confidence !== undefined) fact.confidence = updates.confidence;
+    if (updates.status !== undefined) fact.status = updates.status;
+    if (updates.tags !== undefined) fact.tags = updates.tags;
+    fact.updated_at = new Date().toISOString();
+
+    this.save();
     return fact;
   }
 

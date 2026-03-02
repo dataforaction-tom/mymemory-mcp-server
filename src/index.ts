@@ -655,24 +655,36 @@ Returns: Formatted text block of the user's memory profile.`,
   }
 );
 
-// ─── Tool: Update fact status ────────────────────────────────────────
+// ─── Tool: Update fact ───────────────────────────────────────────────
 
 server.registerTool(
   "memory_update_fact",
   {
     title: "Update Memory Fact",
-    description: `Update the status of a fact. Use this to confirm facts the user has verified, 
-reject facts that are incorrect, or revert rejected facts.
+    description: `Update a saved fact — change its content, category, confidence, status, or tags.
+Use this to correct facts, confirm pending facts, reject incorrect ones, or
+recategorise facts.
 
 Args:
   - id (string): The fact ID to update
-  - status (string): New status — "confirmed", "pending", or "rejected"
+  - content (string, optional): Updated content text
+  - category (string, optional): Updated category
+  - confidence (number, optional): Updated confidence (0.0-1.0)
+  - status (string, optional): "confirmed", "pending", or "rejected"
+  - tags (string[], optional): Updated tags
 
 Returns: The updated fact.`,
     inputSchema: {
       id: z.string().describe("Fact ID to update"),
-      status: z.enum(["confirmed", "pending", "rejected"])
-        .describe("New status"),
+      content: z.string().min(3).optional().describe("Updated fact content"),
+      category: z.enum([
+        "work", "personal", "technical", "preferences", "goals",
+        "health", "values", "social", "finance", "travel", "education", "context"
+      ]).optional().describe("Updated category"),
+      confidence: z.number().min(0).max(1).optional().describe("Updated confidence"),
+      status: z.enum(["confirmed", "pending", "rejected"]).optional()
+        .describe("Updated status"),
+      tags: z.array(z.string()).optional().describe("Updated tags"),
     },
     annotations: {
       readOnlyHint: false,
@@ -682,7 +694,13 @@ Returns: The updated fact.`,
     },
   },
   async (params) => {
-    const fact = store.updateFactStatus(params.id, params.status);
+    const fact = store.updateFact(params.id, {
+      content: params.content,
+      category: params.category,
+      confidence: params.confidence,
+      status: params.status,
+      tags: params.tags,
+    });
 
     if (!fact) {
       return {
@@ -702,7 +720,10 @@ Returns: The updated fact.`,
           fact: {
             id: fact.id,
             content: fact.content,
+            category: fact.category,
+            confidence: fact.confidence,
             status: fact.status,
+            tags: fact.tags,
             updated_at: fact.updated_at,
           },
         }, null, 2),

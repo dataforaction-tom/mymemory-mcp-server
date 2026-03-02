@@ -69,8 +69,47 @@ describe("duplicate detection", () => {
 
   it("should not match rejected facts", () => {
     const { fact } = store.addFact({ content: "Works as a consultant", category: "work" });
-    store.updateFactStatus(fact.id, "rejected");
+    store.updateFact(fact.id, { status: "rejected" });
     const matches = store.findSimilar("Works as a consultant", "work");
     assert.equal(matches.length, 0);
+  });
+});
+
+describe("fact editing", () => {
+  let store: MemoryStore;
+  let dir: string;
+
+  beforeEach(() => {
+    ({ store, dir } = makeTempStore());
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("should update fact content", () => {
+    const { fact } = store.addFact({ content: "Works in London", category: "work" });
+    // Nudge the original timestamp into the past so the update always differs
+    fact.updated_at = "2000-01-01T00:00:00.000Z";
+    const updated = store.updateFact(fact.id, { content: "Works in Manchester" });
+    assert.ok(updated);
+    assert.equal(updated!.content, "Works in Manchester");
+    assert.notEqual(updated!.updated_at, "2000-01-01T00:00:00.000Z");
+  });
+
+  it("should update fact category and tags", () => {
+    const { fact } = store.addFact({ content: "Enjoys hiking", category: "personal" });
+    const updated = store.updateFact(fact.id, {
+      category: "health",
+      tags: ["exercise", "outdoors"],
+    });
+    assert.ok(updated);
+    assert.equal(updated!.category, "health");
+    assert.deepEqual(updated!.tags, ["exercise", "outdoors"]);
+  });
+
+  it("should return undefined for non-existent fact", () => {
+    const updated = store.updateFact("non-existent-id", { content: "test" });
+    assert.equal(updated, undefined);
   });
 });
