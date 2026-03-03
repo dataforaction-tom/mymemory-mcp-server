@@ -303,3 +303,35 @@ describe("semantic search", () => {
     assert.ok(results.length > 0);
   });
 });
+
+describe("provider attribution", () => {
+  let store: MemoryStore;
+  let dir: string;
+
+  beforeEach(() => {
+    ({ store, dir } = makeTempStore());
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("should track facts per provider", () => {
+    store.addFact({ content: "Fact A", category: "work", source_provider: "claude" });
+    store.addFact({ content: "Fact B", category: "work", source_provider: "claude" });
+    store.addFact({ content: "Fact C", category: "work", source_provider: "chatgpt" });
+
+    const stats = store.getProviderStats();
+    assert.equal(stats.providers["claude"].fact_count, 2);
+    assert.equal(stats.providers["chatgpt"].fact_count, 1);
+  });
+
+  it("should list categories per provider", () => {
+    store.addFact({ content: "Work fact", category: "work", source_provider: "claude" });
+    store.addFact({ content: "Personal fact", category: "personal", source_provider: "claude" });
+
+    const stats = store.getProviderStats();
+    assert.ok(stats.providers["claude"].categories.includes("work"));
+    assert.ok(stats.providers["claude"].categories.includes("personal"));
+  });
+});

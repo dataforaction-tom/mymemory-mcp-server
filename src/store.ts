@@ -635,6 +635,45 @@ export class MemoryStore {
     return lines.join("\n");
   }
 
+  getProviderStats(): {
+    providers: Record<string, {
+      fact_count: number;
+      categories: string[];
+      latest_fact: string;
+    }>;
+    total_providers: number;
+  } {
+    const providerMap = new Map<string, { facts: Fact[] }>();
+
+    for (const f of this.data.facts) {
+      if (f.status === "rejected") continue;
+      const entry = providerMap.get(f.source_provider) ?? { facts: [] };
+      entry.facts.push(f);
+      providerMap.set(f.source_provider, entry);
+    }
+
+    const providers: Record<string, {
+      fact_count: number;
+      categories: string[];
+      latest_fact: string;
+    }> = {};
+
+    for (const [name, entry] of providerMap) {
+      const cats = [...new Set(entry.facts.map(f => f.category))];
+      const latest = entry.facts.sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )[0];
+
+      providers[name] = {
+        fact_count: entry.facts.length,
+        categories: cats,
+        latest_fact: latest.created_at,
+      };
+    }
+
+    return { providers, total_providers: providerMap.size };
+  }
+
   getStats(): {
     total_facts: number;
     confirmed_facts: number;

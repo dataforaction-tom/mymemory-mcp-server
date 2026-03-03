@@ -1130,6 +1130,35 @@ Returns: Array of stale facts that may need re-confirmation or rejection.`,
   }
 );
 
+// ─── Tool: Provider Attribution Stats ─────────────────────────────────
+
+server.registerTool(
+  "memory_provider_stats",
+  {
+    title: "Provider Attribution Stats",
+    description: `Show which LLM providers have contributed facts to the memory store,
+how many facts each has contributed, and which categories they cover.
+
+Returns: Provider breakdown with fact counts and categories.`,
+    inputSchema: {},
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  async () => {
+    const stats = store.getProviderStats();
+    return {
+      content: [{
+        type: "text" as const,
+        text: JSON.stringify(stats, null, 2),
+      }],
+    };
+  }
+);
+
 // ─── Tool: Stats ─────────────────────────────────────────────────────
 
 server.registerTool(
