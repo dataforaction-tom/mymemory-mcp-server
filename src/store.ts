@@ -820,6 +820,9 @@ export class MemoryStore {
     status?: FactStatus;
     category?: string;
   }): number {
+    if (!params.status && !params.category) {
+      throw new Error("bulkDelete requires at least status or category");
+    }
     const before = this.data.facts.length;
     this.data.facts = this.data.facts.filter(f => {
       if (params.status && f.status === params.status) {

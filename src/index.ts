@@ -1315,6 +1315,10 @@ Returns: Number of facts affected.`,
         }
         count = store.bulkDelete({ category: params.category });
         break;
+      default: {
+        const _exhaustive: never = params.action;
+        throw new Error(`Unknown action: ${_exhaustive}`);
+      }
     }
 
     return {
