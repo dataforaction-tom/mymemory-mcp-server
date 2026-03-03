@@ -29,6 +29,7 @@ export interface Fact {
   updated_at: string;
   tags: string[];
   supersedes?: string;      // id of fact this replaces
+  expires_at?: string;      // ISO 8601, optional TTL
 }
 
 /** Draft facts live in memory only — not persisted until explicitly saved */
@@ -322,6 +323,7 @@ export class MemoryStore {
     status?: FactStatus;
     tags?: string[];
     supersedes?: string;
+    expires_at?: string;
   }): { fact: Fact; duplicates: Array<{ fact: Fact; similarity: number }> } {
     // Check for duplicates before adding
     const duplicates = this.findSimilar(params.content, params.category);
@@ -339,6 +341,7 @@ export class MemoryStore {
       updated_at: now,
       tags: params.tags ?? [],
       supersedes: params.supersedes,
+      expires_at: params.expires_at,
     };
 
     // If superseding, mark old fact as rejected
@@ -365,8 +368,15 @@ export class MemoryStore {
     status?: FactStatus;
     tags?: string[];
     limit?: number;
+    include_expired?: boolean;
   }): Fact[] {
     let results = this.data.facts;
+
+    // Filter out expired facts by default
+    if (!params.include_expired) {
+      const now = new Date().getTime();
+      results = results.filter(f => !f.expires_at || new Date(f.expires_at).getTime() > now);
+    }
 
     if (params.status) {
       results = results.filter(f => f.status === params.status);
@@ -444,6 +454,14 @@ export class MemoryStore {
     this.data.facts.splice(idx, 1);
     this.save();
     return true;
+  }
+
+  /** Get facts older than `daysOld` days that are still confirmed — candidates for review */
+  getStale(daysOld = 90): Fact[] {
+    const cutoff = new Date(Date.now() - daysOld * 86400000).toISOString();
+    return this.data.facts.filter(
+      f => f.status === "confirmed" && f.updated_at < cutoff
+    );
   }
 
   // ─── Documents ───────────────────────────────────────────────────
@@ -657,10 +675,13 @@ export class MemoryStore {
       }
     }
 
-    // Include confirmed facts not covered by documents
+    // Include confirmed facts not covered by documents (exclude expired)
     const docFactIds = new Set(this.data.documents.flatMap(d => d.fact_ids));
+    const now = new Date().getTime();
     let facts = this.data.facts.filter(
-      f => f.status === "confirmed" && !docFactIds.has(f.id)
+      f => f.status === "confirmed"
+        && !docFactIds.has(f.id)
+        && (!f.expires_at || new Date(f.expires_at).getTime() > now)
     );
 
     if (params?.categories) {

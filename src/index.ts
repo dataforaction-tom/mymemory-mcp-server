@@ -92,6 +92,8 @@ Examples:
         .describe("Searchable tags"),
       supersedes: z.string().optional()
         .describe("ID of fact this replaces/corrects"),
+      expires_at: z.string().optional()
+        .describe("ISO 8601 expiry date — fact is hidden after this date"),
     },
     annotations: {
       readOnlyHint: false,
@@ -109,6 +111,7 @@ Examples:
       source_conversation: params.source_conversation,
       tags: params.tags,
       supersedes: params.supersedes,
+      expires_at: params.expires_at,
     });
 
     return {
@@ -162,6 +165,8 @@ Returns: Summary of stored facts with their IDs.`,
         ]),
         confidence: z.number().min(0).max(1).optional(),
         tags: z.array(z.string()).optional(),
+        expires_at: z.string().optional()
+          .describe("ISO 8601 expiry date — fact is hidden after this date"),
       })).min(1).describe("Array of facts to store"),
       source_provider: z.string().optional()
         .describe("Default LLM provider name for all facts"),
@@ -181,6 +186,7 @@ Returns: Summary of stored facts with their IDs.`,
         confidence: f.confidence,
         source_provider: params.source_provider,
         tags: f.tags,
+        expires_at: f.expires_at,
       })
     );
 
@@ -1062,6 +1068,65 @@ Returns: Summary of what was imported and what was skipped.`,
         isError: true,
       };
     }
+  }
+);
+
+// ─── Tool: Review stale facts ────────────────────────────────────────
+
+server.registerTool(
+  "memory_review_stale",
+  {
+    title: "Review Stale Facts",
+    description: `Surface facts that haven't been updated recently and may be outdated.
+Use this periodically to keep the memory store fresh and accurate.
+
+Args:
+  - days_old (number, optional): Minimum age in days (default: 90)
+  - category (string, optional): Filter to a specific category
+
+Returns: Array of stale facts that may need re-confirmation or rejection.`,
+    inputSchema: {
+      days_old: z.number().int().min(1).optional()
+        .describe("Minimum age in days (default: 90)"),
+      category: z.enum([
+        "work", "personal", "technical", "preferences", "goals",
+        "health", "values", "social", "finance", "travel", "education", "context"
+      ]).optional().describe("Filter to category"),
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  async (params) => {
+    let stale = store.getStale(params.days_old ?? 90);
+
+    if (params.category) {
+      stale = stale.filter(f => f.category === params.category);
+    }
+
+    return {
+      content: [{
+        type: "text" as const,
+        text: JSON.stringify({
+          count: stale.length,
+          facts: stale.map(f => ({
+            id: f.id,
+            content: f.content,
+            category: f.category,
+            updated_at: f.updated_at,
+            days_since_update: Math.floor(
+              (Date.now() - new Date(f.updated_at).getTime()) / 86400000
+            ),
+          })),
+          hint: stale.length > 0
+            ? "Review these facts — confirm if still accurate, reject or update if not."
+            : "All facts are recently updated.",
+        }, null, 2),
+      }],
+    };
   }
 );
 

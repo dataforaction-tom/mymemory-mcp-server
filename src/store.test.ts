@@ -205,3 +205,73 @@ describe("import", () => {
     assert.equal(doc!.title, "Work Profile");
   });
 });
+
+describe("retention and decay", () => {
+  let store: MemoryStore;
+  let dir: string;
+
+  beforeEach(() => {
+    ({ store, dir } = makeTempStore());
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("should exclude expired facts from search by default", () => {
+    const { fact } = store.addFact({
+      content: "Currently interviewing at Acme",
+      category: "context",
+      expires_at: new Date(Date.now() - 86400000).toISOString(), // yesterday
+    });
+
+    const results = store.searchFacts({ query: "Acme" });
+    assert.equal(results.length, 0);
+  });
+
+  it("should include expired facts when explicitly requested", () => {
+    store.addFact({
+      content: "Currently interviewing at Acme",
+      category: "context",
+      expires_at: new Date(Date.now() - 86400000).toISOString(),
+    });
+
+    const results = store.searchFacts({ query: "Acme", include_expired: true });
+    assert.equal(results.length, 1);
+  });
+
+  it("should exclude expired facts from buildContext", () => {
+    store.addFact({
+      content: "Expired fact",
+      category: "context",
+      expires_at: new Date(Date.now() - 86400000).toISOString(),
+    });
+    store.addFact({ content: "Current fact", category: "context" });
+
+    const context = store.buildContext();
+    assert.ok(!context.includes("Expired fact"));
+    assert.ok(context.includes("Current fact"));
+  });
+
+  it("should not consider fresh facts as stale", () => {
+    store.addFact({
+      content: "Just learned this today",
+      category: "work",
+    });
+    const stale = store.getStale(1);
+    assert.equal(stale.length, 0, "a fact created just now should not be stale at 1-day threshold");
+  });
+
+  it("should find stale facts that need review", () => {
+    store.addFact({
+      content: "Old fact from last year",
+      category: "work",
+    });
+    // getStale uses updated_at < cutoff. With a negative daysOld, the cutoff
+    // moves into the future, so any fact updated now will be "stale".
+    // This lets us verify the method works without needing to manipulate time.
+    const stale = store.getStale(-1);
+    assert.ok(stale.length >= 1, "fact should be stale when cutoff is in the future");
+    assert.equal(stale[0].content, "Old fact from last year");
+  });
+});
