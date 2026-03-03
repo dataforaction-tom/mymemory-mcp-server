@@ -38,7 +38,7 @@
  * Storage: ~/.memory-mcp/store.json (flat JSON, no native deps)
  */
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { MemoryStore } from "./store.js";
@@ -1388,6 +1388,29 @@ server.registerResource(
             "(No memory context available yet. Start storing facts to build the user's profile.)",
         },
       ],
+    };
+  }
+);
+
+// ─── Resource: Per-category memory profiles ──────────────────────────
+
+server.registerResource(
+  "memory-category",
+  new ResourceTemplate("memory://category/{name}", { list: undefined }),
+  {
+    title: "Memory Category",
+    description: "Memory profile for a specific category",
+    mimeType: "text/plain",
+  },
+  async (uri, variables) => {
+    const name = variables.name as string;
+    const context = store.buildContext({ categories: [name] });
+    return {
+      contents: [{
+        uri: uri.href,
+        mimeType: "text/plain",
+        text: context || `(No facts in category "${name}" yet.)`,
+      }],
     };
   }
 );
