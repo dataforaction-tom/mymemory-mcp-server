@@ -426,8 +426,8 @@ export class MemoryStore {
       const scoredResults = scored.map(s => results[s.index]);
       results = scoredResults;
     } else {
-      // Sort by most recently updated when no query
-      results.sort((a, b) =>
+      // Sort by most recently updated when no query (copy to avoid mutating internal array)
+      results = [...results].sort((a, b) =>
         new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
       );
     }

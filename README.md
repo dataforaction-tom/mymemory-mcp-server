@@ -13,7 +13,7 @@ Instead of each LLM provider maintaining its own siloed memory about you, this M
 - **Duplicate detection** — token-similarity matching prevents redundant facts from accumulating
 - **Full fact editing** — update content, category, tags, and confidence on any saved fact
 - **Auto-context MCP resource** — clients can subscribe to `memory://profile` for automatic context injection
-- **AES-256-GCM encryption at rest** — set `MEMORY_ENCRYPTION_KEY` to encrypt your store file
+- **AES-256-GCM encryption at rest** — set `MEMORY_MCP_PASSPHRASE` to encrypt your store file
 - **Import with conflict resolution** — round-trip import/export with skip, overwrite, or merge strategies
 - **Retention and expiry** — facts can carry an `expires_at` date; stale-fact review surfaces old entries
 - **Scored token search** — search results are ranked by token overlap relevance
@@ -74,7 +74,7 @@ To enable encryption at rest, add an environment variable:
       "command": "node",
       "args": ["/absolute/path/to/memory-mcp-server/dist/index.js"],
       "env": {
-        "MEMORY_ENCRYPTION_KEY": "your-secret-key-here"
+        "MEMORY_MCP_PASSPHRASE": "your-secret-key-here"
       }
     }
   }
@@ -166,7 +166,7 @@ For quick one-off saves when you don't need a review step:
 
 Everything lives in `~/.memory-mcp/store.json` — a single JSON file you can inspect, back up, sync via git, or share. No database, no native dependencies, no compilation step.
 
-When encryption is enabled (`MEMORY_ENCRYPTION_KEY`), the store file is encrypted with AES-256-GCM. The change log is stored separately in `~/.memory-mcp/changelog.json`.
+When encryption is enabled (`MEMORY_MCP_PASSPHRASE`), the store file is encrypted with AES-256-GCM. The change log is stored separately in `~/.memory-mcp/changelog.json`.
 
 ### Data model
 
