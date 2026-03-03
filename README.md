@@ -81,7 +81,41 @@ To enable encryption at rest, add an environment variable:
 }
 ```
 
-### 3. Use it
+### 3. HTTP Transport (Remote Access)
+
+To use memory-mcp-server with Mistral Le Chat, OpenAI, or Google Gemini Enterprise,
+run it in HTTP mode:
+
+```bash
+# Local development
+memory-mcp-server --http
+
+# Custom port
+memory-mcp-server --http --port 8080
+
+# Remote deployment (all interfaces + auth)
+MEMORY_MCP_API_KEY=your-secret-key memory-mcp-server --http --host 0.0.0.0
+```
+
+#### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `MEMORY_MCP_API_KEY` | Bearer token for HTTP authentication (optional — required for remote deployments) |
+| `MCP_PORT` | HTTP port (default: 3000, overridden by `--port`) |
+| `MCP_HOST` | Bind address (default: 127.0.0.1, overridden by `--host`) |
+
+#### Connecting from Platforms
+
+**Mistral Le Chat:** Add a Custom Connector with URL `https://your-server.example.com/mcp` and select "HTTP Bearer Token" authentication.
+
+**OpenAI:** Configure as a remote MCP server with URL `https://your-server.example.com/mcp` and your bearer token.
+
+**Google Gemini Enterprise:** Add as a custom MCP server with the Streamable HTTP URL `https://your-server.example.com/mcp`.
+
+> **Note:** For remote deployments, use a reverse proxy (Caddy, nginx, Cloudflare Tunnel) to terminate HTTPS. The server speaks plain HTTP.
+
+### 4. Use it
 
 Once connected, Claude has access to **23 tools** across several workflows, plus **2 MCP resources** for automatic context injection.
 
@@ -216,7 +250,7 @@ Custom categories can be added at runtime via `memory_update_schema`.
 │  Claude Desktop / claude.ai     │
 │  (or any MCP-compatible client) │
 └──────────────┬──────────────────┘
-               │ MCP (stdio)
+               │ MCP (stdio or HTTP)
 ┌──────────────▼──────────────────┐
 │      memory-mcp-server v1.0     │
 │                                 │
@@ -251,7 +285,7 @@ Custom categories can be added at runtime via `memory_update_schema`.
 - [x] Bulk operations
 - [x] Per-category MCP resources
 - [x] Write rate limiting
-- [ ] HTTP transport for remote/multi-client scenarios
+- [x] HTTP transport for remote/multi-client scenarios
 - [ ] Shareable memory links (as in My Memory v2)
 - [ ] Android companion app with share-sheet integration
 
