@@ -304,6 +304,55 @@ describe("semantic search", () => {
   });
 });
 
+describe("schema customization", () => {
+  let store: MemoryStore;
+  let dir: string;
+
+  beforeEach(() => {
+    ({ store, dir } = makeTempStore());
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("should add a custom category", () => {
+    const result = store.addCategory({
+      name: "recipes",
+      description: "Favourite recipes and cooking notes",
+      hints: ["ingredients", "cooking methods"],
+      examples: ["Makes a great risotto"],
+    });
+    assert.ok(result);
+    const schema = store.getSchema();
+    assert.ok(schema.some(c => c.name === "recipes"));
+  });
+
+  it("should reject duplicate category names", () => {
+    const result = store.addCategory({
+      name: "work",
+      description: "duplicate",
+      hints: [],
+      examples: [],
+    });
+    assert.equal(result, false);
+  });
+
+  it("should update an existing category", () => {
+    store.updateCategory("work", { description: "Updated work description" });
+    const schema = store.getSchema();
+    const work = schema.find(c => c.name === "work");
+    assert.equal(work!.description, "Updated work description");
+  });
+
+  it("should remove a custom category", () => {
+    store.addCategory({ name: "custom", description: "test", hints: [], examples: [] });
+    const removed = store.removeCategory("custom");
+    assert.ok(removed);
+    assert.ok(!store.getSchema().some(c => c.name === "custom"));
+  });
+});
+
 describe("provider attribution", () => {
   let store: MemoryStore;
   let dir: string;

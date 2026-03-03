@@ -515,6 +515,31 @@ export class MemoryStore {
     return this.data.schema;
   }
 
+  addCategory(category: SchemaCategory): boolean {
+    if (this.data.schema.some(c => c.name === category.name)) return false;
+    this.data.schema.push(category);
+    this.save();
+    return true;
+  }
+
+  updateCategory(name: string, updates: Partial<Omit<SchemaCategory, "name">>): boolean {
+    const cat = this.data.schema.find(c => c.name === name);
+    if (!cat) return false;
+    if (updates.description !== undefined) cat.description = updates.description;
+    if (updates.hints !== undefined) cat.hints = updates.hints;
+    if (updates.examples !== undefined) cat.examples = updates.examples;
+    this.save();
+    return true;
+  }
+
+  removeCategory(name: string): boolean {
+    const idx = this.data.schema.findIndex(c => c.name === name);
+    if (idx === -1) return false;
+    this.data.schema.splice(idx, 1);
+    this.save();
+    return true;
+  }
+
   // ─── Import ──────────────────────────────────────────────────────
 
   /** Import data from an export, merging with conflict detection */

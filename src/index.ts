@@ -28,6 +28,7 @@
  *   memory_get_document   — Retrieve a memory document by category
  *   memory_list_documents — List all memory documents
  *   memory_get_schema     — View the extraction schema/categories
+ *   memory_update_schema  — Add, update, or remove schema categories
  *   memory_export         — Export all memory as markdown or JSON
  *   memory_import         — Import memory data from a JSON export
  *   memory_stats          — Dashboard stats about your memory store
@@ -78,10 +79,7 @@ Examples:
   - content: "Currently developing a programme called TechFreedom"`,
     inputSchema: {
       content: z.string().min(3).describe("The fact to store as a clear statement"),
-      category: z.enum([
-        "work", "personal", "technical", "preferences", "goals",
-        "health", "values", "social", "finance", "travel", "education", "context"
-      ]).describe("Fact category"),
+      category: z.string().min(2).describe("Category (built-in: work, personal, technical, preferences, goals, health, values, social, finance, travel, education, context)"),
       confidence: z.number().min(0).max(1).optional()
         .describe("Confidence level 0.0-1.0 (default: 0.8)"),
       source_provider: z.string().optional()
@@ -159,10 +157,7 @@ Returns: Summary of stored facts with their IDs.`,
     inputSchema: {
       facts: z.array(z.object({
         content: z.string().min(3),
-        category: z.enum([
-          "work", "personal", "technical", "preferences", "goals",
-          "health", "values", "social", "finance", "travel", "education", "context"
-        ]),
+        category: z.string().min(2).describe("Category (built-in: work, personal, technical, preferences, goals, health, values, social, finance, travel, education, context)"),
         confidence: z.number().min(0).max(1).optional(),
         tags: z.array(z.string()).optional(),
         expires_at: z.string().optional()
@@ -243,10 +238,7 @@ Returns: The draft facts with temporary IDs. These are NOT yet persisted.`,
     inputSchema: {
       facts: z.array(z.object({
         content: z.string().min(3),
-        category: z.enum([
-          "work", "personal", "technical", "preferences", "goals",
-          "health", "values", "social", "finance", "travel", "education", "context"
-        ]),
+        category: z.string().min(2).describe("Category (built-in: work, personal, technical, preferences, goals, health, values, social, finance, travel, education, context)"),
         confidence: z.number().min(0).max(1).optional(),
         tags: z.array(z.string()).optional(),
       })).min(1).describe("Array of draft facts to create"),
@@ -369,10 +361,7 @@ Returns: The updated draft fact.`,
     inputSchema: {
       draft_id: z.string().describe("Draft fact ID to edit"),
       content: z.string().min(3).optional().describe("Updated fact content"),
-      category: z.enum([
-        "work", "personal", "technical", "preferences", "goals",
-        "health", "values", "social", "finance", "travel", "education", "context"
-      ]).optional().describe("Updated category"),
+      category: z.string().min(2).optional().describe("Updated category (built-in: work, personal, technical, preferences, goals, health, values, social, finance, travel, education, context)"),
       confidence: z.number().min(0).max(1).optional().describe("Updated confidence"),
       tags: z.array(z.string()).optional().describe("Updated tags"),
     },
@@ -564,10 +553,7 @@ Args:
 Returns: Array of matching facts sorted by most recently updated.`,
     inputSchema: {
       query: z.string().optional().describe("Search text"),
-      category: z.enum([
-        "work", "personal", "technical", "preferences", "goals",
-        "health", "values", "social", "finance", "travel", "education", "context"
-      ]).optional().describe("Filter by category"),
+      category: z.string().min(2).optional().describe("Filter by category (built-in: work, personal, technical, preferences, goals, health, values, social, finance, travel, education, context)"),
       status: z.enum(["confirmed", "pending", "rejected"]).optional()
         .describe("Filter by fact status"),
       tags: z.array(z.string()).optional().describe("Filter by tags"),
@@ -630,10 +616,7 @@ Args:
 
 Returns: Formatted text block of the user's memory profile.`,
     inputSchema: {
-      categories: z.array(z.enum([
-        "work", "personal", "technical", "preferences", "goals",
-        "health", "values", "social", "finance", "travel", "education", "context"
-      ])).optional().describe("Filter to specific categories"),
+      categories: z.array(z.string().min(2)).optional().describe("Filter to specific categories (built-in: work, personal, technical, preferences, goals, health, values, social, finance, travel, education, context)"),
       max_facts: z.number().int().min(1).max(500).optional()
         .describe("Max individual facts to include (default: 100)"),
       include_documents: z.boolean().optional()
@@ -684,10 +667,7 @@ Returns: The updated fact.`,
     inputSchema: {
       id: z.string().describe("Fact ID to update"),
       content: z.string().min(3).optional().describe("Updated fact content"),
-      category: z.enum([
-        "work", "personal", "technical", "preferences", "goals",
-        "health", "values", "social", "finance", "travel", "education", "context"
-      ]).optional().describe("Updated category"),
+      category: z.string().min(2).optional().describe("Updated category (built-in: work, personal, technical, preferences, goals, health, values, social, finance, travel, education, context)"),
       confidence: z.number().min(0).max(1).optional().describe("Updated confidence"),
       status: z.enum(["confirmed", "pending", "rejected"]).optional()
         .describe("Updated status"),
@@ -807,10 +787,7 @@ Args:
 
 Returns: The created/updated document.`,
     inputSchema: {
-      category: z.enum([
-        "work", "personal", "technical", "preferences", "goals",
-        "health", "values", "social", "finance", "travel", "education", "context"
-      ]).describe("Document category"),
+      category: z.string().min(2).describe("Document category (built-in: work, personal, technical, preferences, goals, health, values, social, finance, travel, education, context)"),
       title: z.string().describe("Document title"),
       content: z.string().min(10).describe("Narrative markdown content"),
       fact_ids: z.array(z.string()).describe("IDs of facts woven into this document"),
@@ -863,10 +840,7 @@ Args:
 
 Returns: The document content, or a message if no document exists yet.`,
     inputSchema: {
-      category: z.enum([
-        "work", "personal", "technical", "preferences", "goals",
-        "health", "values", "social", "finance", "travel", "education", "context"
-      ]).describe("Document category to retrieve"),
+      category: z.string().min(2).describe("Document category to retrieve (built-in: work, personal, technical, preferences, goals, health, values, social, finance, travel, education, context)"),
     },
     annotations: {
       readOnlyHint: true,
@@ -971,6 +945,97 @@ Returns: Array of schema categories with their extraction hints and examples.`,
       content: [{
         type: "text" as const,
         text: JSON.stringify({ categories: schema }, null, 2),
+      }],
+    };
+  }
+);
+
+// ─── Tool: Update schema ─────────────────────────────────────────────
+
+server.registerTool(
+  "memory_update_schema",
+  {
+    title: "Update Memory Schema",
+    description: `Add, update, or remove a category from the memory schema.
+
+Actions:
+  - "add": Create a new custom category
+  - "update": Modify an existing category's description, hints, or examples
+  - "remove": Delete a category from the schema
+
+Args:
+  - action (string): "add", "update", or "remove"
+  - name (string): Category name (lowercase, no spaces)
+  - description (string, optional): Category description (required for "add")
+  - hints (string[], optional): Extraction hints for the LLM
+  - examples (string[], optional): Example facts
+
+Returns: Updated schema or error.`,
+    inputSchema: {
+      action: z.enum(["add", "update", "remove"]).describe("Action to perform"),
+      name: z.string().min(2).max(30).describe("Category name"),
+      description: z.string().optional().describe("Category description"),
+      hints: z.array(z.string()).optional().describe("Extraction hints"),
+      examples: z.array(z.string()).optional().describe("Example facts"),
+    },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  async (params) => {
+    if (params.action === "add") {
+      if (!params.description) {
+        return {
+          content: [{ type: "text" as const, text: "Error: description is required when adding a category." }],
+          isError: true,
+        };
+      }
+      const ok = store.addCategory({
+        name: params.name,
+        description: params.description,
+        hints: params.hints ?? [],
+        examples: params.examples ?? [],
+      });
+      if (!ok) {
+        return {
+          content: [{ type: "text" as const, text: `Error: Category "${params.name}" already exists.` }],
+          isError: true,
+        };
+      }
+    } else if (params.action === "update") {
+      const ok = store.updateCategory(params.name, {
+        description: params.description,
+        hints: params.hints,
+        examples: params.examples,
+      });
+      if (!ok) {
+        return {
+          content: [{ type: "text" as const, text: `Error: Category "${params.name}" not found.` }],
+          isError: true,
+        };
+      }
+    } else {
+      const ok = store.removeCategory(params.name);
+      if (!ok) {
+        return {
+          content: [{ type: "text" as const, text: `Error: Category "${params.name}" not found.` }],
+          isError: true,
+        };
+      }
+    }
+
+    return {
+      content: [{
+        type: "text" as const,
+        text: JSON.stringify({
+          success: true,
+          action: params.action,
+          category: params.name,
+          schema: store.getSchema(),
+        }, null, 2),
       }],
     };
   }
@@ -1088,10 +1153,7 @@ Returns: Array of stale facts that may need re-confirmation or rejection.`,
     inputSchema: {
       days_old: z.number().int().min(1).optional()
         .describe("Minimum age in days (default: 90)"),
-      category: z.enum([
-        "work", "personal", "technical", "preferences", "goals",
-        "health", "values", "social", "finance", "travel", "education", "context"
-      ]).optional().describe("Filter to category"),
+      category: z.string().min(2).optional().describe("Filter to category (built-in: work, personal, technical, preferences, goals, health, values, social, finance, travel, education, context)"),
     },
     annotations: {
       readOnlyHint: true,
