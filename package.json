@@ -1,6 +1,6 @@
 {
   "name": "memory-mcp-server",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "MCP server for portable LLM memory — store, retrieve, and manage personal facts across any LLM provider",
   "type": "module",
   "main": "dist/index.js",

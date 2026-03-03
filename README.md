@@ -8,6 +8,23 @@ Your facts, your machine, your control. No cloud, no account, no telemetry.
 
 Instead of each LLM provider maintaining its own siloed memory about you, this MCP server acts as a **single, local memory store** that any provider can read from and write to. When you tell Claude something about yourself, it gets stored locally. When you later open ChatGPT (once it supports MCP), that context is already there.
 
+**v1.0 highlights:**
+
+- **Duplicate detection** — token-similarity matching prevents redundant facts from accumulating
+- **Full fact editing** — update content, category, tags, and confidence on any saved fact
+- **Auto-context MCP resource** — clients can subscribe to `memory://profile` for automatic context injection
+- **AES-256-GCM encryption at rest** — set `MEMORY_ENCRYPTION_KEY` to encrypt your store file
+- **Import with conflict resolution** — round-trip import/export with skip, overwrite, or merge strategies
+- **Retention and expiry** — facts can carry an `expires_at` date; stale-fact review surfaces old entries
+- **Scored token search** — search results are ranked by token overlap relevance
+- **Provider attribution** — track which LLM provider contributed each fact
+- **Custom categories** — add, edit, or remove schema categories beyond the 12 built-in ones
+- **Category visibility controls** — mark categories as hidden to exclude them from context injection
+- **Change log audit trail** — every mutation is recorded in an append-only log
+- **Bulk operations** — confirm all pending, delete all rejected, or clear a category in one call
+- **Per-category MCP resources** — browse `memory://category/{name}` for category-specific profiles
+- **Write rate limiting** — configurable throttle to prevent runaway writes
+
 This is a companion to the [LLM Memory Extractor](https://github.com/dataforaction-tom/llm-memory-extractor) browser extension, offering an alternative capture path via MCP rather than DOM scraping.
 
 ## How it relates to the browser extension
@@ -48,13 +65,29 @@ Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_
 }
 ```
 
+To enable encryption at rest, add an environment variable:
+
+```json
+{
+  "mcpServers": {
+    "memory": {
+      "command": "node",
+      "args": ["/absolute/path/to/memory-mcp-server/dist/index.js"],
+      "env": {
+        "MEMORY_ENCRYPTION_KEY": "your-secret-key-here"
+      }
+    }
+  }
+}
+```
+
 ### 3. Use it
 
-Once connected, Claude has 17 tools in two workflows:
+Once connected, Claude has access to **23 tools** across several workflows, plus **2 MCP resources** for automatic context injection.
 
 #### Draft workflow (recommended)
 
-The draft workflow separates "gathering" from "saving" — facts accumulate in memory during the conversation and only get persisted when you're ready. This mirrors how the browser extension works (capture → review → confirm).
+The draft workflow separates "gathering" from "saving" — facts accumulate in memory during the conversation and only get persisted when you're ready. This mirrors how the browser extension works (capture -> review -> confirm).
 
 | Tool | What it does |
 |---|---|
@@ -84,16 +117,34 @@ For quick one-off saves when you don't need a review step:
 
 | Tool | What it does |
 |---|---|
-| `memory_search` | Search existing facts |
+| `memory_search` | Search existing facts (scored by token relevance) |
 | `memory_get_context` | Load full memory profile for context |
-| `memory_update_fact` | Confirm, reject, or edit a saved fact |
+| `memory_update_fact` | Confirm, reject, or edit a fact (content, category, tags, confidence) |
 | `memory_delete_fact` | Permanently remove a fact |
 | `memory_merge_document` | Merge facts into a narrative document |
 | `memory_get_document` | Retrieve a memory document |
 | `memory_list_documents` | List all memory documents |
 | `memory_get_schema` | View extraction categories and hints |
+| `memory_update_schema` | Add, update, or remove schema categories |
 | `memory_export` | Export as markdown or JSON |
+| `memory_import` | Import from a JSON export (skip, overwrite, or merge conflicts) |
+| `memory_bulk_update` | Bulk confirm pending, delete rejected, or clear a category |
 | `memory_stats` | Dashboard statistics |
+
+#### Maintenance and insights
+
+| Tool | What it does |
+|---|---|
+| `memory_review_stale` | Surface old facts that may need re-confirmation |
+| `memory_provider_stats` | Provider attribution breakdown (who contributed what) |
+| `memory_changelog` | View recent mutations (audit trail) |
+
+#### MCP Resources
+
+| Resource URI | What it provides |
+|---|---|
+| `memory://profile` | Full memory profile — subscribe for auto-context injection |
+| `memory://category/{name}` | Per-category profile for targeted context |
 
 ### Example prompts
 
@@ -105,10 +156,17 @@ For quick one-off saves when you don't need a review step:
 - "What facts have you picked up about me in this conversation?"
 - "Save everything you've gathered about me"
 - "Drop the one about my location, save the rest"
+- "Show me stale facts that might be outdated"
+- "Which providers have contributed to my memory?"
+- "Show me the change log for recent updates"
+- "Bulk confirm all pending facts"
+- "Import my exported memory backup"
 
 ## Storage
 
 Everything lives in `~/.memory-mcp/store.json` — a single JSON file you can inspect, back up, sync via git, or share. No database, no native dependencies, no compilation step.
+
+When encryption is enabled (`MEMORY_ENCRYPTION_KEY`), the store file is encrypted with AES-256-GCM. The change log is stored separately in `~/.memory-mcp/changelog.json`.
 
 ### Data model
 
@@ -121,13 +179,16 @@ Everything lives in `~/.memory-mcp/store.json` — a single JSON file you can in
   "confidence": 0.9,
   "source_provider": "claude",
   "status": "confirmed",
-  "tags": ["consulting", "organisation"]
+  "tags": ["consulting", "organisation"],
+  "expires_at": null
 }
 ```
 
 **Documents** are narrative profiles that synthesise facts into readable text — one per category, versioned, with diff-trackable history.
 
-**Schema** defines the 12 built-in categories with extraction hints that guide what the LLM looks for.
+**Schema** defines the 12 built-in categories (plus any custom ones you add) with extraction hints that guide what the LLM looks for.
+
+**Change log** records every mutation (add, update, delete, import, bulk operation) with timestamps and metadata.
 
 ## Categories
 
@@ -146,6 +207,8 @@ Everything lives in `~/.memory-mcp/store.json` — a single JSON file you can in
 | education | Qualifications, learning interests |
 | context | Current situation, what's top of mind |
 
+Custom categories can be added at runtime via `memory_update_schema`.
+
 ## Architecture
 
 ```
@@ -155,25 +218,41 @@ Everything lives in `~/.memory-mcp/store.json` — a single JSON file you can in
 └──────────────┬──────────────────┘
                │ MCP (stdio)
 ┌──────────────▼──────────────────┐
-│      memory-mcp-server          │
+│      memory-mcp-server v1.0     │
 │                                 │
-│  12 tools for storing, searching│
-│  merging, and exporting memory  │
+│  23 tools + 2 resources for     │
+│  storing, searching, merging,   │
+│  importing, and exporting memory│
 ├─────────────────────────────────┤
 │  MemoryStore (JSON file-based)  │
+│  AES-256-GCM encryption (opt.)  │
 │  ~/.memory-mcp/store.json       │
+├─────────────────────────────────┤
+│  ChangeLog (append-only audit)  │
+│  ~/.memory-mcp/changelog.json   │
 └─────────────────────────────────┘
 ```
 
 ## Roadmap
 
+- [x] MCP Resources for browsable memory profiles
+- [x] Import from browser extension's IndexedDB export
+- [x] Encryption at rest (AES-256-GCM)
+- [x] Schema customisation via MCP tools
+- [x] Conflict resolution for multi-provider writes
+- [x] Duplicate detection with token similarity
+- [x] Full fact editing (content, category, tags)
+- [x] Auto-context resource for conversation start
+- [x] Retention and expiry
+- [x] Scored token search
+- [x] Provider attribution
+- [x] Category visibility controls
+- [x] Change log audit trail
+- [x] Bulk operations
+- [x] Per-category MCP resources
+- [x] Write rate limiting
 - [ ] HTTP transport for remote/multi-client scenarios
-- [ ] MCP Resources for browsable memory profiles
-- [ ] Import from browser extension's IndexedDB export
-- [ ] Encryption at rest (AES-256-GCM)
 - [ ] Shareable memory links (as in My Memory v2)
-- [ ] Schema customisation via MCP tools
-- [ ] Conflict resolution for multi-provider writes
 - [ ] Android companion app with share-sheet integration
 
 ## Development
@@ -182,6 +261,7 @@ Everything lives in `~/.memory-mcp/store.json` — a single JSON file you can in
 npm run dev     # watch mode
 npm run build   # compile TypeScript
 npm start       # run the server
+npm test        # run the test suite
 ```
 
 ## Licence
