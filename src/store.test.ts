@@ -392,6 +392,49 @@ describe("selective sharing", () => {
   });
 });
 
+describe("bulk operations", () => {
+  let store: MemoryStore;
+  let dir: string;
+
+  beforeEach(() => {
+    ({ store, dir } = makeTempStore());
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("should confirm all pending facts", () => {
+    store.addFact({ content: "Fact 1", category: "work", status: "pending" });
+    store.addFact({ content: "Fact 2", category: "work", status: "pending" });
+    store.addFact({ content: "Fact 3", category: "work", status: "confirmed" });
+
+    const count = store.bulkUpdate({ from_status: "pending", to_status: "confirmed" });
+    assert.equal(count, 2);
+    assert.equal(store.getStats().pending_facts, 0);
+    assert.equal(store.getStats().confirmed_facts, 3);
+  });
+
+  it("should delete all rejected facts", () => {
+    store.addFact({ content: "Good", category: "work" });
+    const { fact } = store.addFact({ content: "Bad", category: "work" });
+    store.updateFact(fact.id, { status: "rejected" });
+
+    const count = store.bulkDelete({ status: "rejected" });
+    assert.equal(count, 1);
+    assert.equal(store.getStats().total_facts, 1);
+  });
+
+  it("should delete by category", () => {
+    store.addFact({ content: "Work fact", category: "work" });
+    store.addFact({ content: "Personal fact", category: "personal" });
+
+    const count = store.bulkDelete({ category: "work" });
+    assert.equal(count, 1);
+    assert.equal(store.getStats().total_facts, 1);
+  });
+});
+
 describe("provider attribution", () => {
   let store: MemoryStore;
   let dir: string;

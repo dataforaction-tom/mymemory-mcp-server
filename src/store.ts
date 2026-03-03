@@ -790,6 +790,55 @@ export class MemoryStore {
     return lines.join("\n");
   }
 
+  // ─── Bulk Operations ─────────────────────────────────────────────
+
+  bulkUpdate(params: {
+    from_status: FactStatus;
+    to_status: FactStatus;
+    category?: string;
+  }): number {
+    const now = new Date().toISOString();
+    let count = 0;
+    for (const fact of this.data.facts) {
+      if (fact.status !== params.from_status) continue;
+      if (params.category && fact.category !== params.category) continue;
+      fact.status = params.to_status;
+      fact.updated_at = now;
+      count++;
+    }
+    if (count > 0) {
+      this.save();
+      this.changelog.append({
+        action: "bulk_update",
+        details: { count, from: params.from_status, to: params.to_status },
+      });
+    }
+    return count;
+  }
+
+  bulkDelete(params: {
+    status?: FactStatus;
+    category?: string;
+  }): number {
+    const before = this.data.facts.length;
+    this.data.facts = this.data.facts.filter(f => {
+      if (params.status && f.status === params.status) {
+        if (!params.category || f.category === params.category) return false;
+      }
+      if (params.category && !params.status && f.category === params.category) return false;
+      return true;
+    });
+    const removed = before - this.data.facts.length;
+    if (removed > 0) {
+      this.save();
+      this.changelog.append({
+        action: "bulk_delete",
+        details: { count: removed, ...params },
+      });
+    }
+    return removed;
+  }
+
   getChangelog(limit?: number): ChangeEntry[] {
     return this.changelog.getRecent(limit);
   }

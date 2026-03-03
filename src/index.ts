@@ -31,6 +31,7 @@
  *   memory_update_schema  — Add, update, or remove schema categories
  *   memory_export         — Export all memory as markdown or JSON
  *   memory_import         — Import memory data from a JSON export
+ *   memory_bulk_update    — Bulk confirm pending, delete rejected, clear category
  *   memory_stats          — Dashboard stats about your memory store
  *   memory_changelog      — View recent changes (audit trail)
  *
@@ -1255,6 +1256,75 @@ Returns: Array of change log entries, most recent first.`,
       content: [{
         type: "text" as const,
         text: JSON.stringify({ count: entries.length, entries }, null, 2),
+      }],
+    };
+  }
+);
+
+// ─── Tool: Bulk Operations ────────────────────────────────────────
+
+server.registerTool(
+  "memory_bulk_update",
+  {
+    title: "Bulk Memory Operations",
+    description: `Perform bulk operations on the memory store.
+
+Actions:
+  - "confirm_pending": Confirm all pending facts
+  - "delete_rejected": Delete all rejected facts
+  - "delete_category": Delete all facts in a category
+
+Args:
+  - action (string): The bulk action
+  - category (string, optional): Filter to a specific category
+
+Returns: Number of facts affected.`,
+    inputSchema: {
+      action: z.enum(["confirm_pending", "delete_rejected", "delete_category"])
+        .describe("Bulk action to perform"),
+      category: z.string().optional()
+        .describe("Category to filter (required for delete_category)"),
+    },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  async (params) => {
+    let count: number;
+
+    switch (params.action) {
+      case "confirm_pending":
+        count = store.bulkUpdate({
+          from_status: "pending",
+          to_status: "confirmed",
+          category: params.category,
+        });
+        break;
+      case "delete_rejected":
+        count = store.bulkDelete({ status: "rejected", category: params.category });
+        break;
+      case "delete_category":
+        if (!params.category) {
+          return {
+            content: [{ type: "text" as const, text: "Error: category is required for delete_category." }],
+            isError: true,
+          };
+        }
+        count = store.bulkDelete({ category: params.category });
+        break;
+    }
+
+    return {
+      content: [{
+        type: "text" as const,
+        text: JSON.stringify({
+          action: params.action,
+          affected: count,
+          category: params.category ?? "all",
+        }, null, 2),
       }],
     };
   }
