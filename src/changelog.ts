@@ -21,7 +21,8 @@ export class ChangeLog {
   private load(): ChangeEntry[] {
     if (existsSync(this.file)) {
       try {
-        return JSON.parse(readFileSync(this.file, "utf-8"));
+        const data = JSON.parse(readFileSync(this.file, "utf-8"));
+        return Array.isArray(data) ? data : [];
       } catch {
         return [];
       }
@@ -33,11 +34,16 @@ export class ChangeLog {
     writeFileSync(this.file, JSON.stringify(this.entries, null, 2), "utf-8");
   }
 
+  private static MAX_ENTRIES = 10_000;
+
   append(entry: Omit<ChangeEntry, "timestamp">): void {
     this.entries.push({
       timestamp: new Date().toISOString(),
       ...entry,
     });
+    if (this.entries.length > ChangeLog.MAX_ENTRIES) {
+      this.entries = this.entries.slice(-ChangeLog.MAX_ENTRIES);
+    }
     this.save();
   }
 

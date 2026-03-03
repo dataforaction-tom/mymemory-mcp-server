@@ -529,6 +529,7 @@ export class MemoryStore {
     if (this.data.schema.some(c => c.name === category.name)) return false;
     this.data.schema.push(category);
     this.save();
+    this.changelog.append({ action: "add_category", details: { name: category.name } });
     return true;
   }
 
@@ -540,6 +541,7 @@ export class MemoryStore {
     if (updates.examples !== undefined) cat.examples = updates.examples;
     if (updates.visibility !== undefined) cat.visibility = updates.visibility;
     this.save();
+    this.changelog.append({ action: "update_category", details: { name } });
     return true;
   }
 
@@ -548,6 +550,7 @@ export class MemoryStore {
     if (idx === -1) return false;
     this.data.schema.splice(idx, 1);
     this.save();
+    this.changelog.append({ action: "remove_category", details: { name } });
     return true;
   }
 
