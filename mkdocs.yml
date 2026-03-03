@@ -1,0 +1,10 @@
+site_name: "memory-mcp-server Documentation"
+docs_dir: docs
+theme:
+  name: material
+  palette:
+    primary: teal
+nav:
+  - Home: index.md
+  - User Guide: user-guide.md
+  - Changelog: changelog.md
