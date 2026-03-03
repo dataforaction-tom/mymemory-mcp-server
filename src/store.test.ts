@@ -353,6 +353,45 @@ describe("schema customization", () => {
   });
 });
 
+describe("selective sharing", () => {
+  let store: MemoryStore;
+  let dir: string;
+
+  beforeEach(() => {
+    ({ store, dir } = makeTempStore());
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("should exclude hidden categories from buildContext", () => {
+    store.addFact({ content: "Has diabetes", category: "health" });
+    store.addFact({ content: "Likes TypeScript", category: "technical" });
+    store.updateCategory("health", { visibility: "hidden" });
+
+    const context = store.buildContext();
+    assert.ok(!context.includes("diabetes"));
+    assert.ok(context.includes("TypeScript"));
+  });
+
+  it("should include hidden categories when explicitly requested", () => {
+    store.addFact({ content: "Has diabetes", category: "health" });
+    store.updateCategory("health", { visibility: "hidden" });
+
+    const context = store.buildContext({ categories: ["health"] });
+    assert.ok(context.includes("diabetes"));
+  });
+
+  it("should still return hidden facts in explicit search", () => {
+    store.addFact({ content: "Salary is 80k", category: "finance" });
+    store.updateCategory("finance", { visibility: "hidden" });
+
+    const results = store.searchFacts({ query: "salary" });
+    assert.ok(results.length > 0);
+  });
+});
+
 describe("provider attribution", () => {
   let store: MemoryStore;
   let dir: string;

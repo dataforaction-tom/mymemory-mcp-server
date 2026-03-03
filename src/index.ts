@@ -977,6 +977,8 @@ Returns: Updated schema or error.`,
       description: z.string().optional().describe("Category description"),
       hints: z.array(z.string()).optional().describe("Extraction hints"),
       examples: z.array(z.string()).optional().describe("Example facts"),
+      visibility: z.enum(["always", "relevant", "hidden"]).optional()
+        .describe("Category visibility in auto-context: always (default), relevant, or hidden"),
     },
     annotations: {
       readOnlyHint: false,
@@ -1010,6 +1012,7 @@ Returns: Updated schema or error.`,
         description: params.description,
         hints: params.hints,
         examples: params.examples,
+        visibility: params.visibility,
       });
       if (!ok) {
         return {

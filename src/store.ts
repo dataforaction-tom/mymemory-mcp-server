@@ -59,6 +59,7 @@ export interface SchemaCategory {
   description: string;
   hints: string[];          // extraction hints for the LLM
   examples: string[];       // few-shot example facts
+  visibility?: "always" | "relevant" | "hidden";  // default: "always"
 }
 
 interface StoreData {
@@ -528,6 +529,7 @@ export class MemoryStore {
     if (updates.description !== undefined) cat.description = updates.description;
     if (updates.hints !== undefined) cat.hints = updates.hints;
     if (updates.examples !== undefined) cat.examples = updates.examples;
+    if (updates.visibility !== undefined) cat.visibility = updates.visibility;
     this.save();
     return true;
   }
@@ -726,6 +728,12 @@ export class MemoryStore {
     const includeDocuments = params?.include_documents ?? true;
     const maxFacts = params?.max_facts ?? 100;
 
+    const hiddenCategories = new Set(
+      this.data.schema
+        .filter(c => c.visibility === "hidden")
+        .map(c => c.name)
+    );
+
     const lines: string[] = [];
 
     // Include narrative documents
@@ -733,6 +741,8 @@ export class MemoryStore {
       let docs = this.data.documents;
       if (params?.categories) {
         docs = docs.filter(d => params.categories!.includes(d.category));
+      } else {
+        docs = docs.filter(d => !hiddenCategories.has(d.category));
       }
       for (const doc of docs) {
         lines.push(`[${doc.category}] ${doc.content}`);
@@ -750,6 +760,8 @@ export class MemoryStore {
 
     if (params?.categories) {
       facts = facts.filter(f => params.categories!.includes(f.category));
+    } else {
+      facts = facts.filter(f => !hiddenCategories.has(f.category));
     }
 
     facts = facts.slice(0, maxFacts);
