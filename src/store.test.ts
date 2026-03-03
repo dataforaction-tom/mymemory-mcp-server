@@ -275,3 +275,31 @@ describe("retention and decay", () => {
     assert.equal(stale[0].content, "Old fact from last year");
   });
 });
+
+describe("semantic search", () => {
+  let store: MemoryStore;
+  let dir: string;
+
+  beforeEach(() => {
+    ({ store, dir } = makeTempStore());
+    store.addFact({ content: "Works as a consultant in organisational development", category: "work" });
+    store.addFact({ content: "Prefers TypeScript over JavaScript", category: "technical" });
+    store.addFact({ content: "Lives in North East England", category: "personal" });
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("should find facts by keyword relevance", () => {
+    const results = store.searchFacts({ query: "consultant" });
+    assert.ok(results.length > 0);
+    assert.ok(results[0].content.includes("consultant"));
+  });
+
+  it("should match across tags too", () => {
+    store.addFact({ content: "Uses VS Code", category: "technical", tags: ["editor", "IDE"] });
+    const results = store.searchFacts({ query: "editor" });
+    assert.ok(results.length > 0);
+  });
+});

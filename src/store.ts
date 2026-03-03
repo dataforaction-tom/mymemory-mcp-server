@@ -10,7 +10,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
-import { tokenSimilarity } from "./similarity.js";
+import { tokenSimilarity, scoredSearch } from "./similarity.js";
 import { encrypt, decrypt } from "./crypto.js";
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -390,18 +390,18 @@ export class MemoryStore {
       );
     }
     if (params.query) {
-      const q = params.query.toLowerCase();
-      results = results.filter(f =>
-        f.content.toLowerCase().includes(q) ||
-        f.category.toLowerCase().includes(q) ||
-        f.tags.some(t => t.toLowerCase().includes(q))
+      const contents = results.map(f => f.content + " " + f.tags.join(" "));
+      const scored = scoredSearch(params.query, contents);
+
+      // Reorder results by relevance score
+      const scoredResults = scored.map(s => results[s.index]);
+      results = scoredResults;
+    } else {
+      // Sort by most recently updated when no query
+      results.sort((a, b) =>
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
       );
     }
-
-    // Sort by most recently updated
-    results.sort((a, b) =>
-      new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-    );
 
     return results.slice(0, params.limit ?? 20);
   }
