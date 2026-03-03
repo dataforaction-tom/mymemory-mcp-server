@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { tokenSimilarity } from "./similarity.js";
+import { encrypt, decrypt } from "./crypto.js";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -153,13 +154,15 @@ export class MemoryStore {
   private dataDir: string;
   private dataFile: string;
   private data: StoreData;
+  private passphrase?: string;
 
   /** In-memory draft facts — not persisted until save_all is called */
   private drafts: DraftFact[] = [];
 
-  constructor(dataDir?: string) {
+  constructor(dataDir?: string, passphrase?: string) {
     this.dataDir = dataDir || join(homedir(), ".memory-mcp");
     this.dataFile = join(this.dataDir, "store.json");
+    this.passphrase = passphrase || process.env.MEMORY_MCP_PASSPHRASE || undefined;
 
     if (!existsSync(this.dataDir)) {
       mkdirSync(this.dataDir, { recursive: true });
@@ -172,9 +175,9 @@ export class MemoryStore {
     if (existsSync(this.dataFile)) {
       try {
         const raw = readFileSync(this.dataFile, "utf-8");
-        return JSON.parse(raw) as StoreData;
+        const json = this.passphrase ? decrypt(raw, this.passphrase) : raw;
+        return JSON.parse(json) as StoreData;
       } catch {
-        // Corrupted file — start fresh but back up old
         const backup = this.dataFile + ".backup." + Date.now();
         try {
           const raw = readFileSync(this.dataFile, "utf-8");
@@ -197,7 +200,9 @@ export class MemoryStore {
 
   private save(): void {
     this.data.meta.last_modified = new Date().toISOString();
-    writeFileSync(this.dataFile, JSON.stringify(this.data, null, 2), "utf-8");
+    const json = JSON.stringify(this.data, null, 2);
+    const output = this.passphrase ? encrypt(json, this.passphrase) : json;
+    writeFileSync(this.dataFile, output, "utf-8");
   }
 
   // ─── Draft Facts (in-memory only) ────────────────────────────────

@@ -113,3 +113,35 @@ describe("fact editing", () => {
     assert.equal(updated, undefined);
   });
 });
+
+describe("encrypted store", () => {
+  let dir: string;
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("should persist and reload with encryption", () => {
+    dir = mkdtempSync(join(tmpdir(), "memory-mcp-test-enc-"));
+    const store1 = new MemoryStore(dir, "my-secret");
+    store1.addFact({ content: "Encrypted fact", category: "work" });
+
+    // Reload from disk
+    const store2 = new MemoryStore(dir, "my-secret");
+    const stats = store2.getStats();
+    assert.equal(stats.total_facts, 1);
+
+    const results = store2.searchFacts({ query: "Encrypted" });
+    assert.equal(results[0].content, "Encrypted fact");
+  });
+
+  it("should fail to load with wrong passphrase", () => {
+    dir = mkdtempSync(join(tmpdir(), "memory-mcp-test-enc-"));
+    const store1 = new MemoryStore(dir, "correct-pass");
+    store1.addFact({ content: "Secret", category: "work" });
+
+    // Should start fresh (corrupted decrypt = new store)
+    const store2 = new MemoryStore(dir, "wrong-pass");
+    assert.equal(store2.getStats().total_facts, 0);
+  });
+});
