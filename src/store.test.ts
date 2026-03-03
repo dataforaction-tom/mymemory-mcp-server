@@ -145,3 +145,63 @@ describe("encrypted store", () => {
     assert.equal(store2.getStats().total_facts, 0);
   });
 });
+
+describe("import", () => {
+  let store: MemoryStore;
+  let dir: string;
+
+  beforeEach(() => {
+    ({ store, dir } = makeTempStore());
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("should import facts from JSON export", () => {
+    const srcDir = mkdtempSync(join(tmpdir(), "memory-src-"));
+    const source = new MemoryStore(srcDir);
+    source.addFact({ content: "Fact from other machine", category: "work" });
+    const exported = source.exportAll();
+    rmSync(srcDir, { recursive: true, force: true });
+
+    const result = store.importData(exported);
+    assert.equal(result.imported_facts, 1);
+    assert.equal(result.skipped_duplicates, 0);
+    assert.equal(store.getStats().total_facts, 1);
+  });
+
+  it("should skip duplicate facts during import", () => {
+    store.addFact({ content: "Already exists here", category: "work" });
+
+    const srcDir = mkdtempSync(join(tmpdir(), "memory-src-"));
+    const source = new MemoryStore(srcDir);
+    source.addFact({ content: "Already exists here", category: "work" });
+    const exported = source.exportAll();
+    rmSync(srcDir, { recursive: true, force: true });
+
+    const result = store.importData(exported);
+    assert.equal(result.imported_facts, 0);
+    assert.equal(result.skipped_duplicates, 1);
+    assert.equal(store.getStats().total_facts, 1);
+  });
+
+  it("should import documents", () => {
+    const srcDir = mkdtempSync(join(tmpdir(), "memory-src-"));
+    const source = new MemoryStore(srcDir);
+    source.upsertDocument({
+      category: "work",
+      title: "Work Profile",
+      content: "Works as a consultant",
+      fact_ids: [],
+    });
+    const exported = source.exportAll();
+    rmSync(srcDir, { recursive: true, force: true });
+
+    const result = store.importData(exported);
+    assert.equal(result.imported_documents, 1);
+    const doc = store.getDocument("work");
+    assert.ok(doc);
+    assert.equal(doc!.title, "Work Profile");
+  });
+});

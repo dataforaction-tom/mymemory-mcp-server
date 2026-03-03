@@ -29,6 +29,7 @@
  *   memory_list_documents — List all memory documents
  *   memory_get_schema     — View the extraction schema/categories
  *   memory_export         — Export all memory as markdown or JSON
+ *   memory_import         — Import memory data from a JSON export
  *   memory_stats          — Dashboard stats about your memory store
  * 
  * Storage: ~/.memory-mcp/store.json (flat JSON, no native deps)
@@ -1009,6 +1010,58 @@ Returns: The exported memory profile.`,
         text: JSON.stringify(store.exportAll(), null, 2),
       }],
     };
+  }
+);
+
+// ─── Tool: Import ────────────────────────────────────────────────────
+
+server.registerTool(
+  "memory_import",
+  {
+    title: "Import Memory",
+    description: `Import memory data from a JSON export. Use this to restore from a backup,
+merge data from another machine, or migrate from another system.
+
+Duplicate facts (by ID or content similarity) are automatically skipped.
+Documents are merged — newer versions replace older ones.
+
+Args:
+  - data (string): JSON string of exported memory data (same format as memory_export JSON output)
+
+Returns: Summary of what was imported and what was skipped.`,
+    inputSchema: {
+      data: z.string().min(2).describe("JSON string of memory data to import"),
+    },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  async (params) => {
+    try {
+      const parsed = JSON.parse(params.data);
+      const result = store.importData(parsed);
+
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({
+            success: true,
+            ...result,
+          }, null, 2),
+        }],
+      };
+    } catch (err) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: `Error: Invalid JSON data. ${err instanceof Error ? err.message : "Parse failed"}`,
+        }],
+        isError: true,
+      };
+    }
   }
 );
 

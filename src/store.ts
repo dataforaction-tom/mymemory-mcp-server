@@ -497,6 +497,72 @@ export class MemoryStore {
     return this.data.schema;
   }
 
+  // ─── Import ──────────────────────────────────────────────────────
+
+  /** Import data from an export, merging with conflict detection */
+  importData(data: {
+    facts?: Fact[];
+    documents?: MemoryDocument[];
+  }): {
+    imported_facts: number;
+    skipped_duplicates: number;
+    imported_documents: number;
+    skipped_documents: number;
+  } {
+    let imported_facts = 0;
+    let skipped_duplicates = 0;
+    let imported_documents = 0;
+    let skipped_documents = 0;
+
+    // Import facts
+    if (data.facts) {
+      for (const incoming of data.facts) {
+        // Skip if exact ID already exists
+        if (this.data.facts.some(f => f.id === incoming.id)) {
+          skipped_duplicates++;
+          continue;
+        }
+
+        // Skip if content is a near-duplicate
+        const similar = this.findSimilar(incoming.content, incoming.category, 0.85);
+        if (similar.length > 0) {
+          skipped_duplicates++;
+          continue;
+        }
+
+        this.data.facts.push({ ...incoming });
+        imported_facts++;
+      }
+    }
+
+    // Import documents
+    if (data.documents) {
+      for (const incoming of data.documents) {
+        const existing = this.data.documents.find(d => d.category === incoming.category);
+        if (existing) {
+          // Only replace if incoming is newer
+          if (new Date(incoming.updated_at) > new Date(existing.updated_at)) {
+            existing.title = incoming.title;
+            existing.content = incoming.content;
+            existing.fact_ids = [...new Set([...existing.fact_ids, ...incoming.fact_ids])];
+            existing.version += 1;
+            existing.updated_at = incoming.updated_at;
+            imported_documents++;
+          } else {
+            skipped_documents++;
+          }
+        } else {
+          this.data.documents.push({ ...incoming });
+          imported_documents++;
+        }
+      }
+    }
+
+    this.save();
+
+    return { imported_facts, skipped_duplicates, imported_documents, skipped_documents };
+  }
+
   // ─── Export ──────────────────────────────────────────────────────
 
   exportAll(): StoreData {
