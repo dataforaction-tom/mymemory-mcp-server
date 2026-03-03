@@ -32,7 +32,8 @@
  *   memory_export         — Export all memory as markdown or JSON
  *   memory_import         — Import memory data from a JSON export
  *   memory_stats          — Dashboard stats about your memory store
- * 
+ *   memory_changelog      — View recent changes (audit trail)
+ *
  * Storage: ~/.memory-mcp/store.json (flat JSON, no native deps)
  */
 
@@ -1219,6 +1220,41 @@ Returns: Provider breakdown with fact counts and categories.`,
       content: [{
         type: "text" as const,
         text: JSON.stringify(stats, null, 2),
+      }],
+    };
+  }
+);
+
+// ─── Tool: Change Log ────────────────────────────────────────────────
+
+server.registerTool(
+  "memory_changelog",
+  {
+    title: "Memory Change Log",
+    description: `View recent changes to the memory store — fact additions, updates,
+deletions, imports, etc. Useful for understanding what changed and when.
+
+Args:
+  - limit (number, optional): How many entries to return (default: 50)
+
+Returns: Array of change log entries, most recent first.`,
+    inputSchema: {
+      limit: z.number().int().min(1).max(500).optional()
+        .describe("Max entries (default: 50)"),
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  async (params) => {
+    const entries = store.getChangelog(params.limit);
+    return {
+      content: [{
+        type: "text" as const,
+        text: JSON.stringify({ count: entries.length, entries }, null, 2),
       }],
     };
   }

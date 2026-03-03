@@ -12,6 +12,8 @@ import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { tokenSimilarity, scoredSearch } from "./similarity.js";
 import { encrypt, decrypt } from "./crypto.js";
+import { ChangeLog } from "./changelog.js";
+import type { ChangeEntry } from "./changelog.js";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -157,6 +159,7 @@ export class MemoryStore {
   private dataFile: string;
   private data: StoreData;
   private passphrase?: string;
+  private changelog: ChangeLog;
 
   /** In-memory draft facts — not persisted until save_all is called */
   private drafts: DraftFact[] = [];
@@ -171,6 +174,7 @@ export class MemoryStore {
     }
 
     this.data = this.load();
+    this.changelog = new ChangeLog(this.dataDir);
   }
 
   private load(): StoreData {
@@ -356,6 +360,7 @@ export class MemoryStore {
 
     this.data.facts.push(fact);
     this.save();
+    this.changelog.append({ action: "add_fact", fact_id: fact.id, provider: params.source_provider });
     return { fact, duplicates };
   }
 
@@ -446,6 +451,7 @@ export class MemoryStore {
     fact.updated_at = new Date().toISOString();
 
     this.save();
+    this.changelog.append({ action: "update_fact", fact_id: id });
     return fact;
   }
 
@@ -454,6 +460,7 @@ export class MemoryStore {
     if (idx === -1) return false;
     this.data.facts.splice(idx, 1);
     this.save();
+    this.changelog.append({ action: "delete_fact", fact_id: id });
     return true;
   }
 
@@ -487,6 +494,7 @@ export class MemoryStore {
       existing.version += 1;
       existing.updated_at = now;
       this.save();
+      this.changelog.append({ action: "upsert_document", details: { category: params.category } });
       return existing;
     }
 
@@ -503,6 +511,7 @@ export class MemoryStore {
 
     this.data.documents.push(doc);
     this.save();
+    this.changelog.append({ action: "upsert_document", details: { category: params.category } });
     return doc;
   }
 
@@ -604,6 +613,7 @@ export class MemoryStore {
     }
 
     this.save();
+    this.changelog.append({ action: "import", details: { imported_facts, imported_documents } });
 
     return { imported_facts, skipped_duplicates, imported_documents, skipped_documents };
   }
@@ -775,5 +785,9 @@ export class MemoryStore {
     }
 
     return lines.join("\n");
+  }
+
+  getChangelog(limit?: number): ChangeEntry[] {
+    return this.changelog.getRecent(limit);
   }
 }
