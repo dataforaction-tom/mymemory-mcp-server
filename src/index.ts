@@ -103,40 +103,50 @@ Examples:
     },
   },
   async (params) => {
-    const { fact, duplicates } = store.addFact({
-      content: params.content,
-      category: params.category,
-      confidence: params.confidence,
-      source_provider: params.source_provider,
-      source_conversation: params.source_conversation,
-      tags: params.tags,
-      supersedes: params.supersedes,
-      expires_at: params.expires_at,
-    });
+    try {
+      const { fact, duplicates } = store.addFact({
+        content: params.content,
+        category: params.category,
+        confidence: params.confidence,
+        source_provider: params.source_provider,
+        source_conversation: params.source_conversation,
+        tags: params.tags,
+        supersedes: params.supersedes,
+        expires_at: params.expires_at,
+      });
 
-    return {
-      content: [{
-        type: "text" as const,
-        text: JSON.stringify({
-          stored: true,
-          fact: {
-            id: fact.id,
-            content: fact.content,
-            category: fact.category,
-            confidence: fact.confidence,
-            status: fact.status,
-          },
-          ...(duplicates.length > 0 && {
-            warning: "Similar facts already exist",
-            similar_facts: duplicates.map(d => ({
-              id: d.fact.id,
-              content: d.fact.content,
-              similarity: Math.round(d.similarity * 100) + "%",
-            })),
-          }),
-        }, null, 2),
-      }],
-    };
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({
+            stored: true,
+            fact: {
+              id: fact.id,
+              content: fact.content,
+              category: fact.category,
+              confidence: fact.confidence,
+              status: fact.status,
+            },
+            ...(duplicates.length > 0 && {
+              warning: "Similar facts already exist",
+              similar_facts: duplicates.map(d => ({
+                id: d.fact.id,
+                content: d.fact.content,
+                similarity: Math.round(d.similarity * 100) + "%",
+              })),
+            }),
+          }, null, 2),
+        }],
+      };
+    } catch (err) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: `Error: ${err instanceof Error ? err.message : "Unknown error"}`,
+        }],
+        isError: true,
+      };
+    }
   }
 );
 
@@ -176,43 +186,53 @@ Returns: Summary of stored facts with their IDs.`,
     },
   },
   async (params) => {
-    const results = params.facts.map(f =>
-      store.addFact({
-        content: f.content,
-        category: f.category,
-        confidence: f.confidence,
-        source_provider: params.source_provider,
-        tags: f.tags,
-        expires_at: f.expires_at,
-      })
-    );
+    try {
+      const results = params.facts.map(f =>
+        store.addFact({
+          content: f.content,
+          category: f.category,
+          confidence: f.confidence,
+          source_provider: params.source_provider,
+          tags: f.tags,
+          expires_at: f.expires_at,
+        })
+      );
 
-    return {
-      content: [{
-        type: "text" as const,
-        text: JSON.stringify({
-          stored: true,
-          count: results.length,
-          facts: results.map(r => ({
-            id: r.fact.id,
-            content: r.fact.content,
-            category: r.fact.category,
-          })),
-          ...(results.some(r => r.duplicates.length > 0) && {
-            warnings: results
-              .filter(r => r.duplicates.length > 0)
-              .map(r => ({
-                new_fact: r.fact.content,
-                similar_to: r.duplicates.map(d => ({
-                  id: d.fact.id,
-                  content: d.fact.content,
-                  similarity: Math.round(d.similarity * 100) + "%",
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({
+            stored: true,
+            count: results.length,
+            facts: results.map(r => ({
+              id: r.fact.id,
+              content: r.fact.content,
+              category: r.fact.category,
+            })),
+            ...(results.some(r => r.duplicates.length > 0) && {
+              warnings: results
+                .filter(r => r.duplicates.length > 0)
+                .map(r => ({
+                  new_fact: r.fact.content,
+                  similar_to: r.duplicates.map(d => ({
+                    id: d.fact.id,
+                    content: d.fact.content,
+                    similarity: Math.round(d.similarity * 100) + "%",
+                  })),
                 })),
-              })),
-          }),
-        }, null, 2),
-      }],
-    };
+            }),
+          }, null, 2),
+        }],
+      };
+    } catch (err) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: `Error: ${err instanceof Error ? err.message : "Unknown error"}`,
+        }],
+        isError: true,
+      };
+    }
   }
 );
 
@@ -498,40 +518,50 @@ Returns: The saved facts with their permanent IDs.`,
     },
   },
   async (params) => {
-    const drafts = store.getDrafts();
+    try {
+      const drafts = store.getDrafts();
 
-    if (drafts.length === 0) {
+      if (drafts.length === 0) {
+        return {
+          content: [{
+            type: "text" as const,
+            text: "No draft facts to save. Use memory_create_facts during the conversation first.",
+          }],
+        };
+      }
+
+      const saved = store.saveDrafts({
+        draft_ids: params.draft_ids,
+        status: params.status as FactStatus | undefined,
+        source_conversation: params.source_conversation,
+      });
+
+      const remaining = store.getDrafts();
+
       return {
         content: [{
           type: "text" as const,
-          text: "No draft facts to save. Use memory_create_facts during the conversation first.",
+          text: JSON.stringify({
+            saved: saved.length,
+            remaining_drafts: remaining.length,
+            facts: saved.map(f => ({
+              id: f.id,
+              content: f.content,
+              category: f.category,
+              status: f.status,
+            })),
+          }, null, 2),
         }],
       };
+    } catch (err) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: `Error: ${err instanceof Error ? err.message : "Unknown error"}`,
+        }],
+        isError: true,
+      };
     }
-
-    const saved = store.saveDrafts({
-      draft_ids: params.draft_ids,
-      status: params.status as FactStatus | undefined,
-      source_conversation: params.source_conversation,
-    });
-
-    const remaining = store.getDrafts();
-
-    return {
-      content: [{
-        type: "text" as const,
-        text: JSON.stringify({
-          saved: saved.length,
-          remaining_drafts: remaining.length,
-          facts: saved.map(f => ({
-            id: f.id,
-            content: f.content,
-            category: f.category,
-            status: f.status,
-          })),
-        }, null, 2),
-      }],
-    };
   }
 );
 
@@ -802,29 +832,39 @@ Returns: The created/updated document.`,
     },
   },
   async (params) => {
-    const doc = store.upsertDocument({
-      category: params.category,
-      title: params.title,
-      content: params.content,
-      fact_ids: params.fact_ids,
-    });
+    try {
+      const doc = store.upsertDocument({
+        category: params.category,
+        title: params.title,
+        content: params.content,
+        fact_ids: params.fact_ids,
+      });
 
-    return {
-      content: [{
-        type: "text" as const,
-        text: JSON.stringify({
-          merged: true,
-          document: {
-            id: doc.id,
-            category: doc.category,
-            title: doc.title,
-            version: doc.version,
-            fact_count: doc.fact_ids.length,
-            updated_at: doc.updated_at,
-          },
-        }, null, 2),
-      }],
-    };
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({
+            merged: true,
+            document: {
+              id: doc.id,
+              category: doc.category,
+              title: doc.title,
+              version: doc.version,
+              fact_count: doc.fact_ids.length,
+              updated_at: doc.updated_at,
+            },
+          }, null, 2),
+        }],
+      };
+    } catch (err) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: `Error: ${err instanceof Error ? err.message : "Unknown error"}`,
+        }],
+        isError: true,
+      };
+    }
   }
 );
 
@@ -1133,7 +1173,7 @@ Returns: Summary of what was imported and what was skipped.`,
       return {
         content: [{
           type: "text" as const,
-          text: `Error: Invalid JSON data. ${err instanceof Error ? err.message : "Parse failed"}`,
+          text: `Error: ${err instanceof Error ? err.message : "Unknown error"}`,
         }],
         isError: true,
       };
@@ -1293,44 +1333,54 @@ Returns: Number of facts affected.`,
     },
   },
   async (params) => {
-    let count: number;
+    try {
+      let count: number;
 
-    switch (params.action) {
-      case "confirm_pending":
-        count = store.bulkUpdate({
-          from_status: "pending",
-          to_status: "confirmed",
-          category: params.category,
-        });
-        break;
-      case "delete_rejected":
-        count = store.bulkDelete({ status: "rejected", category: params.category });
-        break;
-      case "delete_category":
-        if (!params.category) {
-          return {
-            content: [{ type: "text" as const, text: "Error: category is required for delete_category." }],
-            isError: true,
-          };
+      switch (params.action) {
+        case "confirm_pending":
+          count = store.bulkUpdate({
+            from_status: "pending",
+            to_status: "confirmed",
+            category: params.category,
+          });
+          break;
+        case "delete_rejected":
+          count = store.bulkDelete({ status: "rejected", category: params.category });
+          break;
+        case "delete_category":
+          if (!params.category) {
+            return {
+              content: [{ type: "text" as const, text: "Error: category is required for delete_category." }],
+              isError: true,
+            };
+          }
+          count = store.bulkDelete({ category: params.category });
+          break;
+        default: {
+          const _exhaustive: never = params.action;
+          throw new Error(`Unknown action: ${_exhaustive}`);
         }
-        count = store.bulkDelete({ category: params.category });
-        break;
-      default: {
-        const _exhaustive: never = params.action;
-        throw new Error(`Unknown action: ${_exhaustive}`);
       }
-    }
 
-    return {
-      content: [{
-        type: "text" as const,
-        text: JSON.stringify({
-          action: params.action,
-          affected: count,
-          category: params.category ?? "all",
-        }, null, 2),
-      }],
-    };
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({
+            action: params.action,
+            affected: count,
+            category: params.category ?? "all",
+          }, null, 2),
+        }],
+      };
+    } catch (err) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: `Error: ${err instanceof Error ? err.message : "Unknown error"}`,
+        }],
+        isError: true,
+      };
+    }
   }
 );
 

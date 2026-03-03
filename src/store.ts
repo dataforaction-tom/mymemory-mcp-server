@@ -164,6 +164,11 @@ export class MemoryStore {
   /** In-memory draft facts — not persisted until save_all is called */
   private drafts: DraftFact[] = [];
 
+  /** Rate limiting — prevents runaway writes */
+  private writeTimestamps: number[] = [];
+  private rateLimit = 30;
+  private rateWindow = 60000; // 1 minute in ms
+
   constructor(dataDir?: string, passphrase?: string) {
     this.dataDir = dataDir || join(homedir(), ".memory-mcp");
     this.dataFile = join(this.dataDir, "store.json");
@@ -209,6 +214,22 @@ export class MemoryStore {
     const json = JSON.stringify(this.data, null, 2);
     const output = this.passphrase ? encrypt(json, this.passphrase) : json;
     writeFileSync(this.dataFile, output, "utf-8");
+  }
+
+  // ─── Rate Limiting ──────────────────────────────────────────────
+
+  setRateLimit(limit: number, windowMs: number): void {
+    this.rateLimit = limit;
+    this.rateWindow = windowMs;
+  }
+
+  private checkRateLimit(): void {
+    const now = Date.now();
+    this.writeTimestamps = this.writeTimestamps.filter(t => now - t < this.rateWindow);
+    if (this.writeTimestamps.length >= this.rateLimit) {
+      throw new Error(`Rate limit exceeded: ${this.rateLimit} writes per ${this.rateWindow / 1000}s`);
+    }
+    this.writeTimestamps.push(now);
   }
 
   // ─── Draft Facts (in-memory only) ────────────────────────────────
@@ -330,6 +351,8 @@ export class MemoryStore {
     supersedes?: string;
     expires_at?: string;
   }): { fact: Fact; duplicates: Array<{ fact: Fact; similarity: number }> } {
+    this.checkRateLimit();
+
     // Check for duplicates before adding
     const duplicates = this.findSimilar(params.content, params.category);
 
@@ -484,6 +507,7 @@ export class MemoryStore {
     content: string;
     fact_ids: string[];
   }): MemoryDocument {
+    this.checkRateLimit();
     const now = new Date().toISOString();
     const existing = this.data.documents.find(d => d.category === params.category);
 
@@ -797,6 +821,7 @@ export class MemoryStore {
     to_status: FactStatus;
     category?: string;
   }): number {
+    this.checkRateLimit();
     const now = new Date().toISOString();
     let count = 0;
     for (const fact of this.data.facts) {
@@ -820,6 +845,7 @@ export class MemoryStore {
     status?: FactStatus;
     category?: string;
   }): number {
+    this.checkRateLimit();
     if (!params.status && !params.category) {
       throw new Error("bulkDelete requires at least status or category");
     }

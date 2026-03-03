@@ -435,6 +435,33 @@ describe("bulk operations", () => {
   });
 });
 
+describe("rate limiting", () => {
+  let store: MemoryStore;
+  let dir: string;
+
+  beforeEach(() => {
+    ({ store, dir } = makeTempStore());
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("should throw after exceeding write limit", () => {
+    // Set a very low limit for testing
+    store.setRateLimit(3, 60000);
+
+    store.addFact({ content: "Fact 1", category: "work" });
+    store.addFact({ content: "Fact 2", category: "work" });
+    store.addFact({ content: "Fact 3", category: "work" });
+
+    assert.throws(
+      () => store.addFact({ content: "Fact 4", category: "work" }),
+      /rate limit/i
+    );
+  });
+});
+
 describe("provider attribution", () => {
   let store: MemoryStore;
   let dir: string;
